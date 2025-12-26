@@ -5,7 +5,7 @@ import { linter } from '@codemirror/lint';
 import { EditorView } from '@codemirror/view';
 import doc from '~/assets/docs/doc.json';
 import { RenderMode, ViewMode } from '~/constants';
-import { createEditorView, delay, highlight, initResizableSplitter, jsonToMarkdown, markdownToHtml, safeParseJson, scrollToAnchor, scrollToTocAnchor, syncViewScroll, useLeaveConfirmation } from '~/utils';
+import { createEditorView, delay, filterJsonByTopic, highlight, initResizableSplitter, jsonToMarkdown, markdownToHtml, safeParseJson, scrollToAnchor, scrollToTocAnchor, syncViewScroll, useLeaveConfirmation } from '~/utils';
 
 const leaveConfirmation = useLeaveConfirmation();
 
@@ -32,6 +32,14 @@ class Converter {
 
   private toc!: HTMLDivElement;
 
+  private fileUploadInput: HTMLInputElement;
+
+  private topicInput: HTMLInputElement;
+
+  private filterButton: HTMLButtonElement;
+
+  private currentJsonData: Record<string, unknown>;
+
   constructor() {
     this.jsonView = document.querySelector('#json-view')!;
     this.previewView = document.querySelector('#preview-view')!;
@@ -40,6 +48,10 @@ class Converter {
     this.viewModeRadioGroup = document.querySelector('#view-mode')!;
     this.renderModeSelect = document.querySelector('#render-mode')!;
     this.splitter = document.querySelector('.splitter')!;
+    this.fileUploadInput = document.querySelector('#file-upload')!;
+    this.topicInput = document.querySelector('#topic-input')!;
+    this.filterButton = document.querySelector('#filter-button')!;
+    this.currentJsonData = doc;
     this.jsonEditorView = this.createJsonEditorView();
     this.htmlEditorView = this.createHtmlEditorView();
     this.markdownEditorView = this.createMarkdownEditorView();
@@ -142,6 +154,8 @@ class Converter {
     this.initViewModeRadioGroup();
     this.initRenderModeSelect();
     this.initAnchors();
+    this.initFileUpload();
+    this.initTopicFilter();
   }
 
   private initLeaveConfirmation() {
@@ -262,6 +276,72 @@ class Converter {
   private highlightTableCodeBlocks() {
     const codeBlocks = document.querySelectorAll('table td pre code');
     codeBlocks.forEach(block => highlight.highlightElement(block as HTMLElement));
+  }
+
+  private initFileUpload() {
+    this.fileUploadInput.addEventListener('change', async (event) => {
+      const target = event.target as HTMLInputElement;
+      const file = target.files?.[0];
+
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const jsonData = JSON.parse(text);
+        this.currentJsonData = jsonData;
+        this.updateJsonEditor(jsonData);
+        this.topicInput.value = '';
+      } catch (error) {
+        alert('Error parsing JSON file. Please ensure the file contains valid JSON.');
+        console.error('JSON parse error:', error);
+      }
+
+      target.value = '';
+    });
+  }
+
+  private initTopicFilter() {
+    const applyFilter = () => {
+      const topic = this.topicInput.value.trim();
+
+      if (!topic) {
+        this.updateJsonEditor(this.currentJsonData);
+        return;
+      }
+
+      const filteredData = filterJsonByTopic(this.currentJsonData as never, topic);
+
+      if (!filteredData || (typeof filteredData === 'object' && Object.keys(filteredData).length === 0)) {
+        alert(`No data found for topic "${topic}". Showing original data.`);
+        this.updateJsonEditor(this.currentJsonData);
+        return;
+      }
+
+      if (typeof filteredData === 'object' && !Array.isArray(filteredData)) {
+        this.updateJsonEditor(filteredData as Record<string, unknown>);
+      } else {
+        this.updateJsonEditor({ result: filteredData });
+      }
+    };
+
+    this.filterButton.addEventListener('click', applyFilter);
+
+    this.topicInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        applyFilter();
+      }
+    });
+  }
+
+  private updateJsonEditor(data: Record<string, unknown>) {
+    const jsonString = JSON.stringify(data, null, 2);
+    this.jsonEditorView.dispatch({
+      changes: {
+        from: 0,
+        to: this.jsonEditorView.state.doc.length,
+        insert: jsonString,
+      },
+    });
   }
 }
 

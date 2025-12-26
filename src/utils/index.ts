@@ -1,5 +1,6 @@
 import createEditorView from './createEditorView';
 import delay from './delay';
+import filterJsonByTopic from './filterJsonByTopic';
 import highlight from './highlight';
 import initResizableSplitter from './initResizableSplitter';
 import jsonToMarkdown from './jsonToMarkdown';
@@ -15,6 +16,7 @@ import useLeaveConfirmation from './useLeaveConfirmation';
 export {
   createEditorView,
   delay,
+  filterJsonByTopic,
   highlight,
   initResizableSplitter,
   jsonToMarkdown,
